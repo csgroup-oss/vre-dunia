@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=SNAP Desktop
+Comment=
+Exec=/bin/sh "/usr/local/snap/bin/snap" -J-Xmx8G %U
+Icon=/usr/local/snap/snap.png
+Path=
+Terminal=false
+StartupNotify=false

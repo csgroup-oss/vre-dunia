@@ -1,0 +1,7 @@
+ascat==2.3.1
+earthpy==0.9.4
+pygeobase==0.6.2
+pygeogrids==0.5.0
+pynetcf==0.5.0
+rioxarray==0.15.1
+testresources==2.0.1

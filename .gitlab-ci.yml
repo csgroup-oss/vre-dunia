@@ -1,0 +1,8 @@
+include:
+  - project: $CI_PROJECT_NAMESPACE/metislab-esa
+    file: '.gitlab-ci.yml'
+    ref: 'main'
+
+variables:
+  BASENAME: dunia
+  # Add DOCKER_BUILD_ARGS variable in CI/CD with value "--build-arg OCI_REGISTRY_PREFIX=<fill-here-your-CI_REGISTRY_IMAGE-prefix>/"
