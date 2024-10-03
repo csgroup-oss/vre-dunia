@@ -1,0 +1,32 @@
+<mat-toolbar color="primary">
+    <mat-toolbar-row>
+        {{title}}
+        <span class="spacer"></span>
+        <input #uploader type="file" class="file-upload" (change)="upload($event)">
+        <button *ngIf="!loading" mat-button (click)="uploader.click()">
+            <mat-icon>upload</mat-icon><span> Upload a file</span>
+        </button>
+        <button  *ngIf="!loading" mat-button (click)="openDialog()">
+            <mat-icon>add</mat-icon><span> Create a folder</span>
+        </button>
+    </mat-toolbar-row>
+</mat-toolbar>
+
+<app-breadcrumbs *ngIf="!loading" [currentPath]="currentPath" (pathChanged)="move($event)"></app-breadcrumbs>
+
+<mat-spinner *ngIf="loading" class="loader" color="primary" style="height:40px"></mat-spinner>
+
+<section *ngIf="!loading">
+    <mat-list *ngIf="list.length">
+        <div class="list-wrapper" *ngFor="let item of list">
+            <mat-list-item (click)="openFolder(item)">
+                <mat-icon matListItemIcon *ngIf="item.Prefix">folder</mat-icon>
+                <mat-icon matListItemIcon *ngIf="item.Key">note</mat-icon>
+                {{ item.Key || item.Prefix }}
+            </mat-list-item>
+            <mat-icon *ngIf="item.Key" class="action-icon" matListItemIcon (click)="download(item.Key)" color="primary">download</mat-icon>
+            <mat-icon class="action-icon" matListItemIcon (click)="delete(item)" color="warn">delete</mat-icon>
+        </div>
+    </mat-list>
+    <h4 *ngIf="!list.length">Empty folder</h4>
+</section>

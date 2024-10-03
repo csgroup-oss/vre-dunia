@@ -66,6 +66,11 @@ COPY resources/shortcuts/* /opt/vre/desktop/
 # Add SNAP logo
 RUN wget --quiet "https://eo4society.esa.int/wp-content/uploads/2018/11/SNAP_icon-400x400.jpg" -O "/usr/local/snap/snap.png"
 
+# Feat: install S3 Browser
+RUN --mount=type=bind,source=features,target=features \
+    --mount=type=bind,source=resources/s3-browser,target=resources/s3-browser \
+    features/s3-browser.sh && layer-cleanup.sh
+
 RUN usermod -l eoafrica vreuser && \
     groupmod -n eoafrica vreuser && \
     usermod -d /home/eoafrica -m eoafrica && \

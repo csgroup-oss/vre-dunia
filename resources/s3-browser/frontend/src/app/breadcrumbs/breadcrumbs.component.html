@@ -1,0 +1,6 @@
+<span *ngFor="let path of fullPaths; index as $index">
+    <button mat-button (click)="changePath($index)">
+        {{$index === 0 ? 'root' : path}}
+    </button>
+    <span> / </span>
+</span>

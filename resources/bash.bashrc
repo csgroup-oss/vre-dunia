@@ -13,7 +13,6 @@ cat<<MSG
 Welcome to the Virtual Research Environment!
 
 MSG
-cat /.version
 
 # Turn off colors
 echo -e "\e[m"
