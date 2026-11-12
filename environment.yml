@@ -4,5 +4,7 @@ channels:
 dependencies:
   # Python version of metislab-esa: avoid any change by the update
   - python=3.12
+  # earthpy imports pkg_resources, removed from setuptools 82
+  - setuptools<82
   - earthpy
   - pygeogrids
