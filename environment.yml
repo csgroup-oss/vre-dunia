@@ -1,0 +1,8 @@
+name: notebook
+channels:
+  - conda-forge
+dependencies:
+  # Python version of metislab-esa: avoid any change by the update
+  - python=3.12
+  - earthpy
+  - pygeogrids
