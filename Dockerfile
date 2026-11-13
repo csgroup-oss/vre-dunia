@@ -11,6 +11,12 @@ FROM ${OCI_REGISTRY_PREFIX}metislab-esa:${ESA_IMAGE_TAG}
 USER root
 WORKDIR ${HOME}
 
+# SNAP modules update and plugins: long step, kept first and separate (it only depends on resources/snap)
+# so that it is not replayed with the other installations
+RUN --mount=type=bind,source=resources/snap,target=resources/snap \
+    bash resources/snap/update.sh \
+    && layer-cleanup.sh
+
 # apt packages
 RUN --mount=type=bind,source=apt.txt,target=apt.txt \
     apt-get update --fix-missing > /dev/null \
