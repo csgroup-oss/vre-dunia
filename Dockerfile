@@ -6,7 +6,13 @@
 # apt.txt, environment.yml and requirements.txt only list what is added on top of metislab-esa.
 ARG OCI_REGISTRY_PREFIX=
 ARG ESA_IMAGE_TAG=latest
+# Optional Ubuntu archive mirror, supplied by CI: archive.ubuntu.com and
+# security.ubuntu.com are blocked on some build networks, which makes apt-get
+# update loop on "Ign:" for 60s per suite. When empty, stock Ubuntu sources are kept.
+ARG UBUNTU_MIRROR=
 FROM ${OCI_REGISTRY_PREFIX}metislab-esa:${ESA_IMAGE_TAG}
+# Redeclared to be visible inside this stage (ARGs before FROM are not).
+ARG UBUNTU_MIRROR
 
 USER root
 WORKDIR ${HOME}
@@ -19,7 +25,11 @@ RUN --mount=type=bind,source=resources/snap,target=resources/snap \
 
 # apt packages
 RUN --mount=type=bind,source=apt.txt,target=apt.txt \
-    apt-get update --fix-missing > /dev/null \
+    if [ -n "${UBUNTU_MIRROR}" ]; then \
+        sed -i -E "s#https?://(archive|security)\.ubuntu\.com/ubuntu/?#https://${UBUNTU_MIRROR}/ubuntu/#g" \
+            /etc/apt/sources.list.d/ubuntu.sources \
+        ; fi \
+    && apt-get update --fix-missing > /dev/null \
     && xargs -a apt.txt apt-get install -y \
     && layer-cleanup.sh
 
