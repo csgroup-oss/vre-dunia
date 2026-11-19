@@ -1,0 +1,2 @@
+--no-install-recommends
+nginx

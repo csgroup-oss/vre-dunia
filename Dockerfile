@@ -1,88 +1,79 @@
 # Copyright 2024 CS GROUP - France, http://www.c-s.fr
 # All rights reserved
 
-ARG OCI_REGISTRY_PREFIX
-FROM ${OCI_REGISTRY_PREFIX}metislab-esa
+# The ONBUILD instructions of cnes/base-image (Pangeo logic) are only triggered for images
+# directly based on it: they are replayed here on top of metislab-esa.
+# apt.txt, environment.yml and requirements.txt only list what is added on top of metislab-esa.
+ARG OCI_REGISTRY_PREFIX=
+ARG ESA_IMAGE_TAG=latest
+# Optional Ubuntu archive mirror, supplied by CI: archive.ubuntu.com and
+# security.ubuntu.com are blocked on some build networks, which makes apt-get
+# update loop on "Ign:" for 60s per suite. When empty, stock Ubuntu sources are kept.
+ARG UBUNTU_MIRROR=
+FROM ${OCI_REGISTRY_PREFIX}metislab-esa:${ESA_IMAGE_TAG}
+# Redeclared to be visible inside this stage (ARGs before FROM are not).
+ARG UBUNTU_MIRROR
 
 USER root
+WORKDIR ${HOME}
 
-WORKDIR /
+# SNAP modules update and plugins: long step, kept first and separate (it only depends on resources/snap)
+# so that it is not replayed with the other installations
+RUN --mount=type=bind,source=resources/snap,target=resources/snap \
+    bash resources/snap/update.sh \
+    && layer-cleanup.sh
 
-## Add pip packages
-RUN --mount=type=bind,source=requirements.txt,target=/opt/requirements.txt \
-    pip install --no-cache-dir -r /opt/requirements.txt && \
-    # Manually remove Cython to install a newer version (0.29.21 required by pytesmo)
-    # Done manually because upgrade with pip fails (because packaged with distutils)
-    rm -rf /usr/lib/python3/dist-packages/Cython* && \
-    pip install --upgrade Cython pytesmo && \
-    layer-cleanup.sh
+# apt packages
+RUN --mount=type=bind,source=apt.txt,target=apt.txt \
+    if [ -n "${UBUNTU_MIRROR}" ]; then \
+        sed -i -E "s#https?://(archive|security)\.ubuntu\.com/ubuntu/?#https://${UBUNTU_MIRROR}/ubuntu/#g" \
+            /etc/apt/sources.list.d/ubuntu.sources \
+        ; fi \
+    && apt-get update --fix-missing > /dev/null \
+    && xargs -a apt.txt apt-get install -y \
+    && layer-cleanup.sh
 
-## Install our own package tao from local fle
-RUN --mount=type=bind,source=resources,target=/opt/resources \
-    pip install --no-cache-dir /opt/resources/tao* && \
-    layer-cleanup.sh
+# conda environment
+USER ${NB_USER}
+RUN --mount=type=bind,source=environment.yml,target=environment.yml \
+    mamba env update --name ${CONDA_ENV} -f environment.yml \
+    && mamba clean -yaf \
+    && find ${CONDA_DIR} -follow -type f -name '*.a' -delete \
+    && find ${CONDA_DIR} -follow -type f -name '*.js.map' -delete
 
-## Setting creodias as default provider in generated code
+# pip packages
+RUN --mount=type=bind,source=requirements.txt,target=requirements.txt \
+    ${NB_PYTHON_PREFIX}/bin/pip install --no-cache -r requirements.txt
+
+# features
+USER root
+RUN --mount=type=bind,source=resources,target=resources \
+    for script in $(find resources -type f -name install.sh); do \
+        echo "Executing $script"; \
+        bash "$script" || exit 1; \
+        layer-cleanup.sh; \
+    done
+
+# Setting creodias as default provider in generated code
 ENV EODAG__CREODIAS_S3__PRIORITY=2
 
-## Add script to upgrade SNAP and install plugins (plugins install might not be working)
-RUN --mount=type=bind,source=resources,target=opt/resources \
-    /opt/resources/snap/update_snap.sh
-
-## Rename jupyterlab tab
+# Rename jupyterlab tab
 ARG jupyterlab_tab_name
-RUN sed -i -E "s/(<title>.*<\/title>)/<title>${jupyterlab_tab_name}<\/title>/" /usr/local/share/jupyter/lab/static/index.html
+RUN sed -i -E "s/(<title>.*<\/title>)/<title>${jupyterlab_tab_name}<\/title>/" ${NB_PYTHON_PREFIX}/share/jupyter/lab/static/index.html
 
-## Customize Desktop
-COPY resources/branding/wallpaper.png /opt/vre/wallpaper.png
-COPY resources/xfce-perchannel-xml /etc/xdg/xfce4/xfconf/xfce-perchannel-xml
+# Features run as root with HOME=${HOME}: give back to the user the files they created (e.g. ~/.snap, ~/.npm)
+RUN chown -R ${NB_USER}:${NB_USER} ${HOME}
 
-## Add JupyterLab shortcut
-COPY /resources/jupyterlab_shortcuts /opt/vre-eoafrica/jupyterlab_shortcuts
-## The following line, which was copying the "config.py" file into the Docker image, has been temporarily commented out, 
-## and the "config.py" file has been removed. This modification allows for editing the application's homepage and removing the GitLab access icon.
-#RUN cat /opt/vre-eoafrica/jupyterlab_shortcuts/config.py >> /usr/local/etc/jupyter/jupyter_notebook_config.py
-RUN rm /opt/vre-eoafrica/jupyterlab_shortcuts/config.py
+# Rename the standard user (jovyan -> eoafrica)
+# The home directory is made traversable for the `runAsUser: 65534` default securityContext used in the PrePuller hook
+# (see https://z2jh.jupyter.org/en/stable/resources/reference.html#prepuller-hook-containersecuritycontext),
+# otherwise the chdir to the home directory fails.
+RUN usermod -l eoafrica ${NB_USER} \
+    && groupmod -n eoafrica ${NB_USER} \
+    && usermod -d /home/eoafrica -m eoafrica \
+    && chmod o+x /home/eoafrica
+ENV NB_USER=eoafrica \
+    HOME=/home/eoafrica
 
-# Add scripts notebooks resources
-RUN mkdir -p /opt/examples
-COPY resources/jupyter-scripts/examples/ /opt/examples/
-RUN chmod 444 /opt/examples/*.ipynb
-
-## Add Bash banner
-## Put startup scripts
-COPY resources/jupyter-scripts/start-notebook*.sh /usr/local/bin/
-COPY resources/bash.bashrc /etc/
-RUN chmod 755 /usr/local/bin/start-notebook.sh
-
-## Put tests resources
-COPY resources/tests/* /opt/vre/tests/
-RUN rm /opt/vre/tests/vre_tests_ext.sh && \
-    chmod -R +rX /opt/vre/
-
-## Place Desktop shortcut
-COPY resources/shortcuts/* /opt/vre/desktop/
-
-# Add SNAP logo
-RUN wget --quiet "https://eo4society.esa.int/wp-content/uploads/2018/11/SNAP_icon-400x400.jpg" -O "/usr/local/snap/snap.png"
-
-# Feat: install S3 Browser
-RUN --mount=type=bind,source=features,target=features \
-    --mount=type=bind,source=resources/s3-browser,target=resources/s3-browser \
-    features/s3-browser.sh && layer-cleanup.sh
-
-RUN usermod -l eoafrica vreuser && \
-    groupmod -n eoafrica vreuser && \
-    usermod -d /home/eoafrica -m eoafrica && \
-    # Add permission for `runAsUser: 65534` default securityContext used in the PrePuller hook and continous.
-    # It also can be overrided with https://z2jh.jupyter.org/en/stable/resources/reference.html#prepuller-hook-containersecuritycontext
-    # Otherwise, the chdir to the home directory will fail with an error like:
-    # Error response from daemon: OCI runtime create failed: container_linux.go:367: starting container process caused: chdir to cwd ("/home/eoafrica") set in config.json failed
-    chmod o+x /home/eoafrica
-
-## Define standard user
 USER eoafrica
-
 WORKDIR /home/eoafrica
-
-ENTRYPOINT ["start-notebook.sh"]

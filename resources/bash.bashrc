@@ -18,4 +18,6 @@ MSG
 echo -e "\e[m"
 
 # Change to home directory when terminal is opened from virtual desktop
-if [ "$PWD" == "/opt/noVNC-1.2.0" ]; then cd; fi
+if [ "$PWD" == "/opt/noVNC" ]; then cd; fi
+
+alias clamdscan="clamdscan -m"
