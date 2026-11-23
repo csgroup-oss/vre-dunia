@@ -5,7 +5,7 @@
 # directly based on it: they are replayed here on top of metislab-esa.
 # apt.txt, environment.yml and requirements.txt only list what is added on top of metislab-esa.
 ARG OCI_REGISTRY_PREFIX=
-ARG ESA_IMAGE_TAG=latest
+ARG ESA_IMAGE_TAG=1.0.0
 # Optional Ubuntu archive mirror, supplied by CI: archive.ubuntu.com and
 # security.ubuntu.com are blocked on some build networks, which makes apt-get
 # update loop on "Ign:" for 60s per suite. When empty, stock Ubuntu sources are kept.
